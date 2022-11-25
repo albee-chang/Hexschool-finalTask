@@ -35,8 +35,7 @@ productSelect.addEventListener("change", function (e) {
   let str = "";
   const category = e.target.value;
   if (category == "全部") {
-    str += combineHTMLStr(item);
-    productList.innerHTML = str;
+    getProductList();
   } else {
     data.forEach((item) => {
       if (item.category == category) {
@@ -91,7 +90,6 @@ productList.addEventListener("click", function (e) {
 });
 
 //取得購物車資訊
-
 function getCartList() {
   axios
     .get(`${api_url}/customer/${api_path}/carts`)
@@ -122,7 +120,6 @@ function getCartList() {
       console.log(error);
     });
 }
-
 //購物車列表刪除單一品項
 shoppingCartItem.addEventListener("click", function (e) {
   e.preventDefault();
@@ -153,70 +150,78 @@ discardAllBtn.addEventListener("click", function (e) {
       alert("購物車已清空!");
     });
 });
-
-//提交表單
-const submitBtn = document.querySelector(".orderInfo-btn");
-//驗證表單套間格式
+// 進階 : validate.js 驗證
 const constraints = {
   姓名: {
     presence: {
-      allowEmpty: false,
-      message: "必填！",
+      message: "是必填欄位",
     },
   },
   電話: {
     presence: {
-      allowEmpty: false,
-      message: "必填！",
+      message: "是必填欄位",
+    },
+    length: {
+      minimum: 8,
+      message: "號碼需超過 8 碼",
     },
   },
   Email: {
     presence: {
-      allowEmpty: false,
-      message: "必填！",
+      message: "是必填欄位",
+    },
+    email: {
+      message: "格式有誤",
     },
   },
   寄送地址: {
     presence: {
-      allowEmpty: false,
-      message: "必填！",
+      message: "是必填欄位",
     },
   },
 };
+//提交表單
 const submitForm = document.querySelector(".orderInfo-form");
-const orderInfoBtn = document.querySelector(".orderInfo-btn");
-submitBtn.addEventListener("click", function (e) {
-  e.preventDefault();
-  const errors = validate(submitForm, constraints);
-  if (errors) {
-    const keys = Object.keys(errors);
-    const values = Object.values(errors);
-    keys.forEach((item, index) => {
-      document.querySelector(`[data-message="${item}"]`).textContent =
-        values[index];
-    });
-  }
+const submitBtn = document.querySelector(".orderInfo-btn");
+const message = document.querySelectorAll("[data-message]");
+const inputs = document.querySelectorAll("input[type=text],input[type=tel],input[type=email]");
+submitBtn.addEventListener('click',e =>{
+  submitForm.addEventListener("submit",verification(e),false);
+})
 
+
+//util js(價格加上逗號)
+function toThousands(x) {
+  let parts = x.toString().split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.join(".");
+}
+function verification(e) {
+  e.preventDefault();
   if (cartData.length == 0) {
     alert("購物車內沒有商品");
     return;
+  }  
+  let errors = validate(submitForm, constraints);
+  // 如果有誤，呈現錯誤訊息
+  if (errors) {
+    message.forEach((item) => {
+      console.log(errors);
+      item.textContent = "";
+      item.textContent = errors[item.dataset.message];
+    });
+  } else {
+    // 如果沒有錯誤，送出表單
+    addOrder();
   }
-
+}
+function addOrder() {
   const customerName = document.querySelector("#customerName").value;
   const customerPhone = document.querySelector("#customerPhone").value;
   const customerEmail = document.querySelector("#customerEmail").value;
   const customerAddress = document.querySelector("#customerAddress").value;
   const tradeWay = document.querySelector("#tradeWay").value;
-  if (
-    customerName == "" ||
-    customerPhone == "" ||
-    customerEmail == "" ||
-    customerAddress == "" ||
-    tradeWay == ""
-  ) {
-    alert("請輸入訂單資訊");
-    return;
-  }
+
   //產生訂單
   axios
     .post(`${api_url}/customer/${api_path}/orders`, {
@@ -224,7 +229,7 @@ submitBtn.addEventListener("click", function (e) {
         user: {
           name: customerName,
           tel: customerPhone,
-          email: customerPhone,
+          email: customerEmail,
           address: customerAddress,
           payment: tradeWay,
         },
@@ -238,12 +243,22 @@ submitBtn.addEventListener("click", function (e) {
       document.querySelector("#customerAddress").value = "";
       document.querySelector("#tradeWay").value = "ATM";
       getCartList();
+    })
+    .catch(function (error) {
+      console.log(error);
     });
-});
-
-//util js(價格加上逗號)
-function toThousands(x) {
-  let parts = x.toString().split(".");
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return parts.join(".");
 }
+// 監控所有 input 的操作
+inputs.forEach((item) => {
+  item.addEventListener("change", function (e) {
+    e.preventDefault();
+    let key = item.name;
+    let errors = validate(submitForm, constraints);
+    item.nextElementSibling.textContent = "";
+    // 針對正在操作的欄位呈現警告訊息
+    if (errors) {
+      document.querySelector(`[data-message='${key}']`).textContent =
+        errors[key];
+    }
+  });
+});
